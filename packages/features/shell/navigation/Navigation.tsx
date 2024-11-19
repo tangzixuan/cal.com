@@ -98,6 +98,11 @@ const navigation: NavigationItemType[] = [
         href: "/insights/routing",
         isCurrent: ({ pathname: path }) => path?.startsWith("/insights/routing") ?? false,
       },
+      {
+        name: "virtual_queues",
+        href: "/insights/virtual-queues",
+        isCurrent: ({ pathname: path }) => path?.startsWith("/insights/virtual-queues") ?? false,
+      },
     ],
   },
 ];
