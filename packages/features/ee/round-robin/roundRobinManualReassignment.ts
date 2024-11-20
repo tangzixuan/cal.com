@@ -287,6 +287,7 @@ export const roundRobinManualReassignment = async ({
     members: [
       {
         ...newUser,
+        timeZone: newUser.timeZone || originalOrganizer.timeZone,
         name: newUser.name || "",
         username: newUser.username || "",
         timeFormat: getTimeFormatStringFromUserTimeFormat(newUser.timeFormat),
@@ -316,6 +317,7 @@ export const roundRobinManualReassignment = async ({
       [
         {
           ...previousRRHost,
+          timeZone: previousRRHost.timeZone || originalOrganizer.timeZone,
           name: previousRRHost.name || "",
           username: previousRRHost.username || "",
           timeFormat: getTimeFormatStringFromUserTimeFormat(previousRRHost.timeFormat),
