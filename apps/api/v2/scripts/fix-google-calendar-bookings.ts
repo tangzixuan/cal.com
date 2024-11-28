@@ -307,7 +307,7 @@ async function main(uid: number, month: number) {
         }
       }
 
-      await sleep(1000); // Delay between adding events
+      await sleep(500); // Delay between adding events
     }
   } catch (err) {
     console.error(err);
