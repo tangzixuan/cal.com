@@ -240,10 +240,13 @@ async function main(uid: number, month: number) {
 
     const now = dayjs();
     const year = now.year();
-    const startDate = dayjs(`${year}-${month}-01T00:00:00Z`).startOf("month").toISOString();
+    const formattedMonth = month < 10 ? `0${month}` : `${month}`;
+
+    const startDate = dayjs(`${year}-${formattedMonth}-01T00:00:00Z`).startOf("month").toISOString();
     const endDate = dayjs(startDate).endOf("month").toISOString();
 
     const calendarEvents = await fetchGoogleCalendarEvents(calendar, destinationCalendar, startDate, endDate);
+
     const userBookings = await fetchUserBookings(uid, startDate, endDate, prisma);
     const missingBookings = userBookings.filter(
       (booking: any) =>
@@ -252,7 +255,9 @@ async function main(uid: number, month: number) {
             event.summary === booking.title && event.location === booking?.metadata?.videoCallUrl
         )
     );
-
+    console.log("Missing Bookings:", missingBookings?.length ?? 0);
+    console.log("calendar", destinationCalendar.externalId);
+    console.log("crdential", googleCalendarCredential.id);
     for (const missingBooking of missingBookings) {
       const eventType = await prisma.eventType.findFirst({ where: { id: missingBooking.eventTypeId } });
       const eventData = createEventData(missingBooking, user, eventType);
@@ -264,19 +269,14 @@ async function main(uid: number, month: number) {
               type: "google_calendar",
               credentialId: googleCalendarCredential.id,
               bookingId: missingBooking.id,
-              deleted: false,
+              OR: [{ deleted: null }, { deleted: false }],
               externalCalendarId: destinationCalendar.externalId,
             },
           });
           if (alreadyExistingRef?.id) {
+            console.log("Update existing ref");
             await prisma.bookingReference.update({
               where: {
-                // Use a unique combination of fields to identify the record
-                type: "google_calendar",
-                credentialId: googleCalendarCredential.id,
-                bookingId: missingBooking.id,
-                deleted: false,
-                externalCalendarId: destinationCalendar.externalId,
                 id: alreadyExistingRef.id,
               },
               data: {
