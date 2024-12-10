@@ -105,11 +105,11 @@ export const tips = [
   },
   {
     id: 1,
-    thumbnailUrl: "https://img.youtube.com/vi/60HJt8DOVNo/0.jpg",
-    mediaLink: "https://go.cal.com/dynamic-video",
+    thumbnailUrl: "https://img.youtube.com/vi/GdGuqu45Z5Q/0.jpg",
+    mediaLink: "https://www.youtube.com/watch?v=GdGuqu45Z5Q", // turn this into a go.cal.com link
     title: "Dynamic booking links",
     description: "Booking link that allows people to quickly schedule meetings.",
-    href: "https://cal.com/blog/cal-v-1-9",
+    href: "https://cal.com/scheduling/features/dynamic-group-links",
   },
 ];
 
