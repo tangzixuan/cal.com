@@ -13,79 +13,6 @@ export const BookingStatus = {
   AWAITING_HOST: "AWAITING_HOST",
 } as const;
 
-type CalendarEvent = {
-  kind: "calendar#event";
-  etag: string;
-  id: string;
-  status: "confirmed" | "tentative" | "cancelled";
-  htmlLink: string;
-  created: string;
-  updated: string;
-  summary: string;
-  creator: {
-    email: string;
-    displayName?: string;
-    self?: boolean;
-  };
-  organizer: {
-    email: string;
-    displayName?: string;
-    self?: boolean;
-  };
-  start: {
-    dateTime?: string;
-    date?: string;
-    timeZone?: string;
-  };
-  end: {
-    dateTime?: string;
-    date?: string;
-    timeZone?: string;
-  };
-  recurringEventId?: string;
-  originalStartTime?: {
-    dateTime?: string;
-    date?: string;
-    timeZone?: string;
-  };
-  iCalUID: string;
-  sequence: number;
-  attendees?: Array<{
-    email: string;
-    displayName?: string;
-    organizer?: boolean;
-    self?: boolean;
-    responseStatus?: "accepted" | "declined" | "tentative" | "needsAction";
-    comment?: string;
-    additionalGuests?: number;
-  }>;
-  hangoutLink?: string;
-  conferenceData?: {
-    entryPoints: Array<{
-      entryPointType: "video" | "phone" | "sip" | "more";
-      uri: string;
-      label?: string;
-      pin?: string;
-      regionCode?: string;
-    }>;
-    conferenceSolution: {
-      iconUri: string;
-      name: string;
-      type: "eventHangout" | "eventNamedHangout" | "hangoutsMeet";
-    };
-    conferenceId: string;
-    signature?: string;
-  };
-  reminders: {
-    useDefault: boolean;
-    overrides?: Array<{
-      method: "email" | "popup";
-      minutes: number;
-    }>;
-  };
-  eventType: "default" | "focusTime" | "outOfOffice" | "workingLocation";
-};
-
 // Utility function for sleeping
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -193,14 +120,20 @@ function createEventData(missingBooking: any, user: any, eventType: any) {
     })
   );
 
-  return {
+  const payload: any = {
     summary: missingBooking.title,
-    description: "",
+    description: `https://app.cal.com/booking/${missingBooking.uid}`,
     start: { dateTime: missingBooking.startTime, timeZone: user.timeZone },
     end: { dateTime: missingBooking.endTime, timeZone: user.timeZone },
-    location: missingBooking?.metadata?.videoCallUrl,
+    location: missingBooking?.metadata?.videoCallUrl ?? missingBooking?.location ?? "",
     attendees: [],
   };
+
+  if (eventType.hideCalendarEventDetails) {
+    payload.visibility = "private";
+  }
+
+  return payload;
 }
 
 // Add event to Google Calendar
@@ -218,7 +151,7 @@ async function addEventToGoogleCalendar(calendar: any, destinationCalendar: any,
 }
 
 // Main function to add bookings to Google Calendar
-async function main(uid: number, month: number) {
+async function main(uid: number, month: number, year: number) {
   const prisma = new PrismaClient();
   try {
     const googleCalendarCredential = await getGoogleCredentials(uid, prisma);
@@ -238,11 +171,9 @@ async function main(uid: number, month: number) {
 
     if (!destinationCalendar) throw new Error("No Google Calendar destination found");
 
-    const now = dayjs();
-    const year = now.year();
     const formattedMonth = month < 10 ? `0${month}` : `${month}`;
 
-    const startDate = dayjs(`${year}-${formattedMonth}-01T00:00:00Z`).startOf("month").toISOString();
+    const startDate = dayjs(`${year}-${formattedMonth}-10T00:00:00Z`).toISOString();
     const endDate = dayjs(startDate).endOf("month").toISOString();
 
     const calendarEvents = await fetchGoogleCalendarEvents(calendar, destinationCalendar, startDate, endDate);
@@ -252,12 +183,16 @@ async function main(uid: number, month: number) {
       (booking: any) =>
         !calendarEvents.find(
           (event: any) =>
-            event.summary === booking.title && event.location === booking?.metadata?.videoCallUrl
+            event.summary === booking.title &&
+            (booking?.metadata?.videoCallUrl
+              ? event.location === booking?.metadata?.videoCallUrl
+              : event.location === booking?.location)
         )
     );
     console.log("Missing Bookings:", missingBookings?.length ?? 0);
     console.log("calendar", destinationCalendar.externalId);
     console.log("crdential", googleCalendarCredential.id);
+
     for (const missingBooking of missingBookings) {
       const eventType = await prisma.eventType.findFirst({ where: { id: missingBooking.eventTypeId } });
       const eventData = createEventData(missingBooking, user, eventType);
@@ -307,7 +242,7 @@ async function main(uid: number, month: number) {
         }
       }
 
-      await sleep(500); // Delay between adding events
+      await sleep(100); // Delay between adding events
     }
   } catch (err) {
     console.error(err);
@@ -316,15 +251,55 @@ async function main(uid: number, month: number) {
   }
 }
 
-// Parse arguments from the command line
-const uidFlagIndex = process.argv.findIndex((v) => v === "-uid");
-const uid = Number(process.argv[uidFlagIndex + 1]);
+async function fixMissingGoogleEvents(month: number, year: number) {
+  const prisma = new PrismaClient();
+  const formattedMonth = month < 10 ? `0${month}` : `${month}`;
+  const startDate = dayjs(`${year}-${formattedMonth}-10T00:00:00Z`).toISOString();
+  const endDate = dayjs(startDate).endOf("month").toISOString();
 
+  const missingEventsReferences = await prisma.bookingReference.findMany({
+    where: {
+      type: "google_calendar",
+      meetingId: null,
+      OR: [{ deleted: null }, { deleted: false }],
+      booking: {
+        status: BookingStatus.ACCEPTED,
+        startTime: {
+          gte: startDate,
+          lt: endDate,
+        },
+      },
+    },
+    include: { booking: true },
+  });
+
+  const uniqueUserIds = [
+    ...new Set(missingEventsReferences.map((ref: any) => ref.booking?.userId).filter(Boolean)),
+  ];
+
+  await prisma.$disconnect();
+
+  for (let index = 0; index < uniqueUserIds.length; index++) {
+    const element = uniqueUserIds[index];
+    if (typeof element === "number" && month) {
+      try {
+        await main(element as number, month, year);
+        console.log("Fixed event for:", element);
+      } catch (err) {
+        console.log("Failed for: ", element);
+      }
+    }
+  }
+}
+
+// Parse arguments from the command line
 const monthArgIndex = process.argv.findIndex((v) => v === "-month");
 const month = Number(process.argv[monthArgIndex + 1]);
 
-if (uid && month) {
-  main(uid, month);
+const yearArgIndex = process.argv.findIndex((v) => v === "-year");
+const year = Number(process.argv[yearArgIndex + 1]);
+if (month && year) {
+  fixMissingGoogleEvents(month, year);
 } else {
-  console.log("Provide user id with flag -uid", "Provide month with flag -month (number)");
+  console.log("Provide month with flag -month (number)");
 }
