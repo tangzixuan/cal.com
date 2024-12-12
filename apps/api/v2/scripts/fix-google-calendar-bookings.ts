@@ -173,7 +173,7 @@ async function main(uid: number, month: number, year: number) {
 
     const formattedMonth = month < 10 ? `0${month}` : `${month}`;
 
-    const startDate = dayjs(`${year}-${formattedMonth}-10T00:00:00Z`).toISOString();
+    const startDate = dayjs(`${year}-${formattedMonth}-01T00:00:00Z`).toISOString();
     const endDate = dayjs(startDate).endOf("month").toISOString();
 
     const calendarEvents = await fetchGoogleCalendarEvents(calendar, destinationCalendar, startDate, endDate);
@@ -196,6 +196,29 @@ async function main(uid: number, month: number, year: number) {
     for (const missingBooking of missingBookings) {
       const eventType = await prisma.eventType.findFirst({ where: { id: missingBooking.eventTypeId } });
       const eventData = createEventData(missingBooking, user, eventType);
+      console.log("missingBooking", missingBooking);
+      const alreadyExistingRefWithMeeting = await prisma.bookingReference.findFirst({
+        where: {
+          type: "google_calendar",
+          credentialId: googleCalendarCredential.id,
+          bookingId: missingBooking.id,
+          NOT: { meetingId: null },
+          externalCalendarId: destinationCalendar.externalId,
+        },
+      });
+
+      console.log("ALREADY REFs", alreadyExistingRefWithMeeting);
+
+      if (alreadyExistingRefWithMeeting) {
+        console.log(
+          "NO REF or multiple ref ISSUE DONT DO ANYTHING",
+          missingBooking.id,
+          googleCalendarCredential.id,
+          destinationCalendar.externalId
+        );
+        return;
+      }
+      return;
       const createdEvent = await addEventToGoogleCalendar(calendar, destinationCalendar, eventData);
       if (createdEvent?.data?.id) {
         try {
@@ -254,7 +277,7 @@ async function main(uid: number, month: number, year: number) {
 async function fixMissingGoogleEvents(month: number, year: number) {
   const prisma = new PrismaClient();
   const formattedMonth = month < 10 ? `0${month}` : `${month}`;
-  const startDate = dayjs(`${year}-${formattedMonth}-10T00:00:00Z`).toISOString();
+  const startDate = dayjs(`${year}-${formattedMonth}-01T00:00:00Z`).toISOString();
   const endDate = dayjs(startDate).endOf("month").toISOString();
 
   const missingEventsReferences = await prisma.bookingReference.findMany({
@@ -268,15 +291,23 @@ async function fixMissingGoogleEvents(month: number, year: number) {
           gte: startDate,
           lt: endDate,
         },
+        user: {
+          profiles: {
+            some: {
+              organizationId: 15637,
+            },
+          },
+        },
       },
     },
     include: { booking: true },
   });
-
-  const uniqueUserIds = [
-    ...new Set(missingEventsReferences.map((ref: any) => ref.booking?.userId).filter(Boolean)),
+  console.log(missingEventsReferences);
+  const uniqueUserIds = [725826];
+  const uniqueUserEmails = [
+    ...new Set(missingEventsReferences.map((ref: any) => ref.booking?.userPrimaryEmail).filter(Boolean)),
   ];
-
+  console.log(uniqueUserEmails);
   await prisma.$disconnect();
 
   for (let index = 0; index < uniqueUserIds.length; index++) {
