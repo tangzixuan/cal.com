@@ -1,9 +1,10 @@
 import type { Prisma, User } from "@prisma/client";
 
-import { getFieldResponse } from "@calcom/app-store/routing-forms/trpc/utils";
 import type { FormResponse, Fields } from "@calcom/app-store/routing-forms/types/types";
-import { zodRoutes, children1Schema } from "@calcom/app-store/routing-forms/zod";
+import { zodRoutes } from "@calcom/app-store/routing-forms/zod";
 import logger from "@calcom/lib/logger";
+import { acrossQueryValueCompatiblity } from "@calcom/lib/raqb/raqbUtils";
+import { raqbQueryValueSchema } from "@calcom/lib/raqb/zod";
 import { safeStringify } from "@calcom/lib/safeStringify";
 import { BookingRepository } from "@calcom/lib/server/repository/booking";
 import prisma from "@calcom/prisma";
@@ -12,12 +13,7 @@ import type { AttributeType } from "@calcom/prisma/enums";
 import { BookingStatus } from "@calcom/prisma/enums";
 
 const log = logger.getSubLogger({ prefix: ["getLuckyUser"] });
-async function getAttributesQueryValue() {
-  const { getAttributesQueryValue } = (await import("@calcom/app-store/routing-forms/lib/raqbUtils"))
-    .acrossQueryValueCompatiblity;
-  return getAttributesQueryValue;
-}
-
+const { getAttributesQueryValue } = acrossQueryValueCompatiblity;
 type PartialBooking = Pick<Booking, "id" | "createdAt" | "userId" | "status"> & {
   attendees: { email: string | null }[];
 };
@@ -70,7 +66,7 @@ interface GetLuckyUserParams<T extends PartialUser> {
   routingFormResponse: RoutingFormResponse | null;
 }
 // === dayjs.utc().startOf("month").toDate();
-const startOfMonth = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
+const startOfMonth = () => new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), 1));
 
 // TS helper function.
 const isNonEmptyArray = <T>(arr: T[]): arr is [T, ...T[]] => arr.length > 0;
@@ -346,7 +342,7 @@ async function getCurrentMonthsBookings({
   return await BookingRepository.getAllBookingsForRoundRobin({
     eventTypeId: eventTypeId,
     users,
-    startDate: startOfMonth,
+    startDate: startOfMonth(),
     endDate: new Date(),
     virtualQueuesData,
   });
@@ -529,7 +525,7 @@ async function fetchAllDataNeededForCalculations<
         eventTypeId: eventType.id,
         isFixed: false,
         createdAt: {
-          gte: startOfMonth,
+          gte: startOfMonth(),
         },
       },
     }),
@@ -791,17 +787,18 @@ async function getQueueAndAttributeWeightData<T extends PartialUser & { priority
     const chosenRoute = routes?.find((route) => route.id === routingFormResponse.chosenRouteId);
 
     if (chosenRoute && "attributesQueryValue" in chosenRoute) {
-      const parsedAttributesQueryValue = children1Schema.parse(chosenRoute.attributesQueryValue);
+      const parsedAttributesQueryValue = raqbQueryValueSchema.parse(chosenRoute.attributesQueryValue);
 
-      const attributesQueryValueWithLabel = (await getAttributesQueryValue())({
+      const attributesQueryValueWithLabel = getAttributesQueryValue({
         attributesQueryValue: chosenRoute.attributesQueryValue,
         attributes: [attributeWithWeights],
-        response,
-        fields: routingFormResponse.form.fields as Fields,
-        getFieldResponse: getFieldResponse,
+        dynamicFieldValueOperands: {
+          fields: (routingFormResponse.form.fields as Fields) || [],
+          response,
+        },
       });
 
-      const parsedAttributesQueryValueWithLabel = children1Schema.parse(attributesQueryValueWithLabel);
+      const parsedAttributesQueryValueWithLabel = raqbQueryValueSchema.parse(attributesQueryValueWithLabel);
 
       if (parsedAttributesQueryValueWithLabel && parsedAttributesQueryValueWithLabel.children1) {
         averageWeightsHosts = getAverageAttributeWeights(
@@ -871,15 +868,15 @@ function getAverageAttributeWeights<
           );
 
           allRRHosts.forEach((rrHost) => {
-            const weight = attributeOptionWithUsers?.assignedUsers.find(
+            const assignedUser = attributeOptionWithUsers?.assignedUsers.find(
               (assignedUser) => rrHost.user.id === assignedUser.member.userId
-            )?.weight;
+            );
 
-            if (weight) {
+            if (assignedUser) {
               if (allRRHostsWeights.has(rrHost.user.id)) {
-                allRRHostsWeights.get(rrHost.user.id)?.push(weight);
+                allRRHostsWeights.get(rrHost.user.id)?.push(assignedUser.weight ?? 100);
               } else {
-                allRRHostsWeights.set(rrHost.user.id, [weight]);
+                allRRHostsWeights.set(rrHost.user.id, [assignedUser.weight ?? 100]);
               }
             }
           });
@@ -900,6 +897,7 @@ function getAverageAttributeWeights<
     "getAverageAttributeWeights",
     safeStringify({ allRRHosts, attributesQueryValueChild, attributeWithWeights, averageWeightsHosts })
   );
+
   return averageWeightsHosts;
 }
 

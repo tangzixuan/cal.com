@@ -336,6 +336,23 @@ export class BookingRepository {
               },
             },
           },
+          {
+            eventType: {
+              parent: {
+                team: {
+                  members: {
+                    some: {
+                      userId,
+                      accepted: true,
+                      role: {
+                        in: ["ADMIN", "OWNER"],
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
         ],
       },
     });
