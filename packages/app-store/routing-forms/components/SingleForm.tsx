@@ -236,21 +236,70 @@ type SingleFormComponentProps = {
   >["enrichedWithUserProfileForm"];
 };
 
-type MembersMatchResultType = {
+type PerUserDataType = {
+  bookingsCount: Record<number, number>;
+  bookingShortfalls: Record<number, number> | null;
+  calibrations: Record<number, number> | null;
+  weights: Record<number, number> | null;
+};
+
+export type MembersMatchResultType = {
   isUsingAttributeWeights: boolean;
   eventTypeRedirectUrl: string | null;
   contactOwnerEmail: string | null;
   teamMembersMatchingAttributeLogic: { id: number; name: string | null; email: string }[] | null;
-  perUserData: {
-    bookingsCount: Record<number, number>;
-    bookingShortfalls: Record<number, number> | null;
-    calibrations: Record<number, number> | null;
-    weights: Record<number, number> | null;
-  } | null;
+  perUserData: PerUserDataType | null;
   checkedFallback: boolean;
   mainWarnings: string[] | null;
   fallbackWarnings: string[] | null;
 } | null;
+
+export const OrderedHostListWithData = ({
+  perUserData,
+  matchingMembers,
+}: {
+  perUserData: PerUserDataType;
+  matchingMembers: {
+    id: number;
+    name: string | null;
+    email: string;
+  }[];
+}) => {
+  return (
+    <span className="font-semibold">
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr className="border-b text-left">
+              <th className="py-2 pr-4">#</th>
+              <th className="py-2 pr-4">Email</th>
+              <th className="py-2 pr-4">Bookings</th>
+              {perUserData.weights ? <th className="py-2">Weight</th> : null}
+              {perUserData.calibrations ? <th className="py-2">Calibration</th> : null}
+              {perUserData.bookingShortfalls ? <th className="border-l py-2 pl-2">Shortfall</th> : null}
+            </tr>
+          </thead>
+          <tbody>
+            {matchingMembers.map((member, index) => (
+              <tr key={member.id} className="border-b">
+                <td className="py-2 pr-4">{index + 1}</td>
+                <td className="py-2 pr-4">{member.email}</td>
+                <td className="py-2">{perUserData.bookingsCount[member.id] ?? 0}</td>
+                {perUserData.weights ? <td className="py-2">{perUserData.weights[member.id] ?? 0}</td> : null}
+                {perUserData.calibrations ? (
+                  <td className="py-2">{perUserData.calibrations[member.id] ?? 0}</td>
+                ) : null}
+                {perUserData.bookingShortfalls ? (
+                  <td className="border-l py-2 pl-2">{perUserData.bookingShortfalls[member.id] ?? 0}</td>
+                ) : null}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </span>
+  );
+};
 
 const TeamMembersMatchResult = ({
   membersMatchResult,
@@ -304,44 +353,8 @@ const TeamMembersMatchResult = ({
 
     if (matchingMembers.length && membersMatchResult.perUserData) {
       const perUserData = membersMatchResult.perUserData;
-      return (
-        <span className="font-semibold">
-          <div className="mt-2 overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="py-2 pr-4">#</th>
-                  <th className="py-2 pr-4">Email</th>
-                  <th className="py-2 pr-4">Bookings</th>
-                  {membersMatchResult.perUserData.weights ? <th className="py-2">Weight</th> : null}
-                  {membersMatchResult.perUserData.calibrations ? <th className="py-2">Calibration</th> : null}
-                  {membersMatchResult.perUserData.bookingShortfalls ? (
-                    <th className="border-l py-2 pl-2">Shortfall</th>
-                  ) : null}
-                </tr>
-              </thead>
-              <tbody>
-                {matchingMembers.map((member, index) => (
-                  <tr key={member.id} className="border-b">
-                    <td className="py-2 pr-4">{index + 1}</td>
-                    <td className="py-2 pr-4">{member.email}</td>
-                    <td className="py-2">{perUserData.bookingsCount[member.id] ?? 0}</td>
-                    {perUserData.weights ? (
-                      <td className="py-2">{perUserData.weights[member.id] ?? 0}</td>
-                    ) : null}
-                    {perUserData.calibrations ? (
-                      <td className="py-2">{perUserData.calibrations[member.id] ?? 0}</td>
-                    ) : null}
-                    {perUserData.bookingShortfalls ? (
-                      <td className="border-l py-2 pl-2">{perUserData.bookingShortfalls[member.id] ?? 0}</td>
-                    ) : null}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </span>
-      );
+
+      return <OrderedHostListWithData perUserData={perUserData} matchingMembers={matchingMembers} />;
     }
 
     return (

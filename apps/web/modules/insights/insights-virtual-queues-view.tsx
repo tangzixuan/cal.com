@@ -1,30 +1,32 @@
 "use client";
 
+import { OrderedHostListWithData } from "@calcom/app-store/routing-forms/components/SingleForm";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import { trpc } from "@calcom/trpc";
 
 import InsightsLayout from "./layout";
 
 export default function InsightsPage() {
   const { t } = useLocale();
 
-  const { data: headers, isLoading: isHeadersLoading } =
-    trpc.viewer.insights.routingFormResponsesHeaders.useQuery(
-      {
-        teamId: selectedTeamId ?? undefined,
-        isAll: isAll ?? false,
-        routingFormId: selectedRoutingFormId ?? undefined,
-      },
-      {
-        enabled: initialConfigIsReady,
-      }
-    );
+  // todo: dropdown to pick routing forms
+  const { data, isLoading: isHeadersLoading } = trpc.viewer.insights.virtualQueues.useQuery({
+    routingFormId: "948ae412-d995-4865-885a-48302588de03",
+  });
 
-  return (
-    <InsightsLayout>
-      List all possible queues here
-      {/* Get all event types where the user is a member of */}
-      {/* Get all routes where this event types is included*/}
-      {/* Get all virtual queues from all the routes */}
-    </InsightsLayout>
-  );
+  if (data) {
+    return (
+      <InsightsLayout>
+        {data.map((virtualQueue, index) => (
+          <OrderedHostListWithData
+            key={index}
+            perUserData={virtualQueue.perUserData}
+            matchingMembers={virtualQueue.matchingMembers}
+          />
+        ))}
+      </InsightsLayout>
+    );
+  }
+
+  return <></>;
 }
