@@ -207,6 +207,7 @@ export class BookingRepository {
     let queueBookings = allBookings;
 
     if (virtualQueuesData) {
+      // currently we only support single select
       queueBookings = allBookings.filter((booking) => {
         const responses = booking.routedFromRoutingFormReponse;
         const fieldId = virtualQueuesData.fieldOptionData.fieldId;
@@ -214,20 +215,17 @@ export class BookingRepository {
 
         const response = responses?.response as FormResponse;
 
-        const responseValue = response[fieldId].value;
+        const firstResponseValue = Array.isArray(response[fieldId].value)
+          ? response[fieldId].value[0]
+          : response[fieldId].value;
 
-        if (Array.isArray(responseValue) && Array.isArray(selectedOptionIds)) {
-          //check if all values are the same (this only support 'all in' not 'any in')
-          return (
-            responseValue.length === selectedOptionIds.length &&
-            responseValue.every((value, index) => value === selectedOptionIds[index])
-          );
-        } else {
-          return responseValue === selectedOptionIds;
-        }
+        const firstSelectedOptionId = Array.isArray(selectedOptionIds)
+          ? selectedOptionIds[0]
+          : selectedOptionIds;
+
+        return firstResponseValue === firstSelectedOptionId;
       });
     }
-    console.log(`queueBookings ${JSON.stringify(queueBookings.map((booking) => booking.id))}`);
     return queueBookings;
   }
 
