@@ -236,7 +236,7 @@ type SingleFormComponentProps = {
   >["enrichedWithUserProfileForm"];
 };
 
-type PerUserDataType = {
+export type PerUserDataType = {
   bookingsCount: Record<number, number>;
   bookingShortfalls: Record<number, number> | null;
   calibrations: Record<number, number> | null;
@@ -258,7 +258,7 @@ export const OrderedHostListWithData = ({
   perUserData,
   matchingMembers,
 }: {
-  perUserData: PerUserDataType;
+  perUserData: PerUserDataType | null;
   matchingMembers: {
     id: number;
     name: string | null;
