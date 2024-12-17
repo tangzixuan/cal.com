@@ -594,6 +594,7 @@ model Attendee {
 
   @@index([email])
   @@index([bookingId])
+  @@index([noShow])
 }
 
 enum BookingStatus {
@@ -673,6 +674,7 @@ model Booking {
   @@index([uid])
   @@index([status])
   @@index([startTime, endTime, status])
+  @@index([noShowHost])
 }
 
 model Schedule {
@@ -1004,6 +1006,7 @@ model App_RoutingForms_FormResponse {
   @@unique([formFillerId, formId])
   @@index([formFillerId])
   @@index([formId])
+  @@index([chosenRouteId])
 }
 
 model Feedback {
