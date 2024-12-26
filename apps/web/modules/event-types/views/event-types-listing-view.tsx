@@ -935,8 +935,34 @@ const InfiniteScrollMain = ({
     <>
       {eventTypeGroups.length >= 1 && (
         <>
-          <HorizontalTabs tabs={tabs} />
-          <InfiniteTeamsTab activeEventTypeGroup={activeEventTypeGroup[0]} />
+          <div className="relative mb-8 flex items-center justify-between gap-4">
+            <div className="relative min-w-0 flex-grow overflow-hidden">
+              <HorizontalTabs
+                tabs={tabs}
+                className="no-scrollbar flex h-9 space-x-1 overflow-x-scroll whitespace-nowrap rounded-md"
+              />
+              <div className="from-background dark:from-darkgray-100 pointer-events-none absolute right-0 top-0 z-10 h-full w-24 bg-gradient-to-l from-white to-transparent" />
+            </div>
+            <TextField
+              className="max-w-64 bg-subtle !border-muted rounded-md !pl-0 focus:!ring-offset-0"
+              addOnLeading={<Icon name="search" className="text-subtle h-4 w-4" />}
+              addOnClassname="!border-muted"
+              containerClassName="min-w-64 focus:!ring-offset-0 h-9"
+              type="search"
+              autoComplete="false"
+              placeholder={t("search")}
+              onChange={(e) => {
+                const setSearchTerm = (window as Window & { setSearchTerm?: (term: string) => void })
+                  .setSearchTerm;
+                if (setSearchTerm) {
+                  setSearchTerm(e.target.value);
+                }
+              }}
+            />
+          </div>
+          <div className="mb-4">
+            <InfiniteTeamsTab activeEventTypeGroup={activeEventTypeGroup[0]} hideSearch={true} />
+          </div>
         </>
       )}
       {eventTypeGroups.length === 0 && <CreateFirstEventTypeView slug={profiles[0].slug ?? ""} />}
