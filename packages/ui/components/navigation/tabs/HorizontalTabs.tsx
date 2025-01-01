@@ -13,10 +13,10 @@ export interface NavTabProps {
 
 const HorizontalTabs = function ({ tabs, linkShallow, linkScroll, actions, ...props }: NavTabProps) {
   return (
-    <div className="mb-4 h-9 max-w-full lg:mb-5">
+    <div className="h-9 max-w-full">
       <nav
         className={classNames(
-          "no-scrollbar flex max-h-9 space-x-1 overflow-x-scroll rounded-md",
+          "no-scrollbar scrollbar-hide flex max-h-9 space-x-2 overflow-x-scroll rounded-md",
           props.className
         )}
         aria-label="Tabs"
